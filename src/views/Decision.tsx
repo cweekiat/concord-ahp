@@ -27,7 +27,7 @@ export default function Decision() {
   if (!model.ready) {
     return (
       <>
-        <StepHeader eyebrow="Step 8 of 8" title="Decide" lede="The decision document needs a complete evaluation record." />
+        <StepHeader eyebrow="Step 8 of 8" title="Decide" lede="Finish the earlier steps first." />
         <Gate blockers={model.blockers} />
         <Pager here="decision" />
       </>
@@ -98,9 +98,8 @@ export default function Decision() {
       <StepHeader
         eyebrow="Step 8 of 8"
         title="Decide"
-        lede="The AHP result informs the decision; the Source Selection Authority makes it. The AI drafts the decision document from the record, and every number in it can be traced to an evidence cell, a judgment or a computation."
-        ai={['Drafts the Source Selection Decision Document', 'Includes screening, consistency, disagreement and sensitivity', 'Leaves the decision section blank']}
-        human={['Evaluators check and edit the draft', 'The SSA selects, writes the rationale and signs', 'The SSA may depart from the ranking if the reason is documented']}
+        ai={['Drafts the decision document']}
+        human={['SSA selects and signs']}
       />
 
       <Section title="Decision document" action={state.memo ? <Segmented label="Document view" value={view} onChange={setView} options={[{ value: 'preview', label: 'Preview' }, { value: 'edit', label: 'Edit' }]} /> : undefined}>
@@ -108,7 +107,6 @@ export default function Decision() {
           <>
             <div className="hstack">
               <AIButton busy={ai.busy} busyLabel="Drafting…" onClick={draft}>Draft the decision document</AIButton>
-              <span className="footnote secondary">Typically about 4 days of drafting by hand.</span>
             </div>
             <ErrorNote error={ai.error} />
           </>

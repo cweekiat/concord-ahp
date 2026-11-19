@@ -3,7 +3,7 @@ import { Section, StepHeader } from '../components/ui';
 export default function Method() {
   return (
     <>
-      <StepHeader eyebrow="Reference" title="Method and guardrails" lede="How Concord computes its numbers, where the AI is and isn’t allowed, and what the method can’t do." />
+      <StepHeader eyebrow="Reference" title="Method and guardrails"  />
 
       <Section title="The maths (no AI involved)">
         <div className="card pad doc">

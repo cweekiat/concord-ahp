@@ -21,10 +21,10 @@ import {
   type SensitivityFacts,
 } from './demo';
 
-export interface AIOptions {
-  mode: 'demo' | 'live';
+import { callLLM, type AIConfig } from './providers';
+
+export interface AIOptions extends AIConfig {
   apiKey: string;
-  model: string;
 }
 
 export interface AIResult<T> {
@@ -33,12 +33,6 @@ export interface AIResult<T> {
   model: string;
   ms: number;
 }
-
-export const MODELS = [
-  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (balanced)' },
-  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (most capable)' },
-  { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 (fastest)' },
-];
 
 const GUARDRAIL = `You support a DoD-style source selection team using the Analytic Hierarchy Process.
 Rules you must follow:
@@ -57,6 +51,24 @@ interface TaskDef<I, O> {
 }
 
 const str = { type: 'string' };
+
+/** Coerce whatever a model returned into plain text (small models sometimes nest objects). */
+export function toText(x: unknown): string {
+  if (x == null) return '';
+  if (typeof x === 'string') return x;
+  if (typeof x === 'number' || typeof x === 'boolean') return String(x);
+  if (Array.isArray(x)) return x.map(toText).filter(Boolean).join(' ');
+  if (typeof x === 'object') {
+    const o = x as Record<string, unknown>;
+    for (const k of ['text', 'content', 'value', 'bullet', 'summary', 'markdown']) if (typeof o[k] === 'string') return o[k] as string;
+    const vals = Object.values(o);
+    if (vals.length === 1) return toText(vals[0]) || Object.keys(o)[0];
+  }
+  if (typeof x === 'object') return Object.entries(x as Record<string, unknown>).map(([k, v]) => (v == null || v === '' ? k : `${k}: ${toText(v)}`)).join('; ');
+  return String(x);
+}
+const texts = (x: unknown): string[] => (Array.isArray(x) ? x : x == null ? [] : [x]).map(toText).filter(Boolean);
+const num = (x: unknown): number => (typeof x === 'number' ? x : parseFloat(String(x).replace(/,/g, '')));
 
 const hierarchy: TaskDef<void, HierarchyDraft> = {
   label: 'Draft criteria hierarchy',
@@ -88,6 +100,16 @@ const hierarchy: TaskDef<void, HierarchyDraft> = {
     required: ['criteria', 'screeningRules', 'gaps'],
   },
   demo: () => DEMO_HIERARCHY,
+  fromLive: (raw) => ({
+    criteria: (Array.isArray(raw?.criteria) ? raw.criteria : []).map((c: any) => ({
+      name: toText(c?.name),
+      rationale: toText(c?.rationale),
+      reqRef: toText(c?.reqRef),
+      subcriteria: (Array.isArray(c?.subcriteria) ? c.subcriteria : []).map((sc: any) => ({ name: toText(sc?.name), measure: toText(sc?.measure), threshold: sc?.threshold ? toText(sc.threshold) : undefined, objective: sc?.objective ? toText(sc.objective) : undefined, reqRef: toText(sc?.reqRef) })),
+    })),
+    screeningRules: texts(raw?.screeningRules),
+    gaps: texts(raw?.gaps),
+  }),
 };
 
 const evidence: TaskDef<void, ExtractionRow[]> = {
@@ -128,7 +150,24 @@ const evidence: TaskDef<void, ExtractionRow[]> = {
   },
   demo: () => DEMO_EXTRACTION,
   // Life-cycle cost comes from the government estimate, not datasheets: keep the recorded rows.
-  fromLive: (raw) => [...(raw.rows as ExtractionRow[]).filter((r) => r.leaf !== 'lcc'), ...DEMO_EXTRACTION.filter((r) => r.leaf === 'lcc')],
+  fromLive: (raw) => {
+    const ids = new Set(QUANT_LEAVES.map((l) => l.id));
+    const rows: ExtractionRow[] = (Array.isArray(raw?.rows) ? raw.rows : [])
+      .map((r: any) => ({
+        alt: String(r?.alt).trim().toUpperCase(),
+        leaf: String(r?.leaf).trim(),
+        value: num(r?.value),
+        unit: toText(r?.unit),
+        quote: toText(r?.quote),
+        source: toText(r?.source),
+        confidence: Math.min(1, Math.max(0, num(r?.confidence) || 0)),
+        flag: r?.flag ? toText(r.flag) : undefined,
+        flagKind: ['ambiguity', 'unit', 'threshold'].includes(r?.flagKind) ? r.flagKind : r?.flag ? 'ambiguity' : undefined,
+      }))
+      .filter((r: ExtractionRow) => ['A', 'B', 'C', 'D'].includes(r.alt) && ids.has(r.leaf) && r.leaf !== 'lcc' && Number.isFinite(r.value));
+    if (rows.length === 0) throw new Error('The model returned no usable evidence rows.');
+    return [...rows, ...DEMO_EXTRACTION.filter((r) => r.leaf === 'lcc')];
+  },
 };
 
 const coach: TaskDef<CoachFacts, CoachNote> = {
@@ -137,6 +176,7 @@ const coach: TaskDef<CoachFacts, CoachNote> = {
   user: (f) => `Facts (computed by the AHP engine):\n${JSON.stringify(f, null, 2)}\nWrite a 3–4 sentence explanation addressed to the evaluator, then one neutral question that asks what they meant.`,
   schema: { type: 'object', properties: { explanation: str, question: str }, required: ['explanation', 'question'] },
   demo: demoCoach,
+  fromLive: (raw) => ({ explanation: toText(raw?.explanation), question: toText(raw?.question) }),
 };
 
 const discussion: TaskDef<DiscussionFacts, DiscussionPrompt[]> = {
@@ -158,15 +198,26 @@ const discussion: TaskDef<DiscussionFacts, DiscussionPrompt[]> = {
     required: ['prompts'],
   },
   demo: demoDiscussion,
-  fromLive: (raw) => raw.prompts,
+  fromLive: (raw) =>
+    (Array.isArray(raw?.prompts) ? raw.prompts : []).map((p: any) => ({
+      criterion: toText(p?.criterion).toUpperCase(),
+      addressedTo: texts(p?.addressedTo),
+      question: toText(p?.question),
+      why: toText(p?.why),
+    })),
 };
 
 const sensitivity: TaskDef<SensitivityFacts, SensitivityNote> = {
   label: 'Explain sensitivity',
   system: GUARDRAIL + '\nTask: explain one-at-a-time sensitivity results to a decision-maker in plain language.',
-  user: (f) => `Sensitivity facts (computed):\n${JSON.stringify(f, null, 2)}\nWrite a 1–2 sentence summary and up to 5 bullets. Weights are fractions; show them as percentages.`,
+  user: (f) => {
+    const p = (x: number) => `${(x * 100).toFixed(0)}%`;
+    const lines = f.reversals.map((r) => `- ${r.criterion}: weight is ${p(r.current)} now. If it ${r.at > r.current ? 'rises' : 'falls'} to ${p(r.at)}, ${r.newLeader} ranks first instead of ${f.leader}.`);
+    return `Computed facts:\n- ${f.leader} ranks first, ${(f.margin * 100).toFixed(1)} points ahead of ${f.runnerUp}.\n${lines.join('\n')}\n- No single weight change alters the leader for: ${f.stable.join(', ') || 'none'}.\nWrite a 1–2 sentence summary naming the change closest to the current weights, then up to 5 bullets. Use only these numbers.`;
+  },
   schema: { type: 'object', properties: { summary: str, bullets: { type: 'array', items: str } }, required: ['summary', 'bullets'] },
   demo: demoSensitivity,
+  fromLive: (raw) => ({ summary: toText(raw?.summary), bullets: texts(raw?.bullets) }),
 };
 
 const memo: TaskDef<MemoFacts, string> = {
@@ -177,7 +228,7 @@ const memo: TaskDef<MemoFacts, string> = {
   user: (f) => `Evaluation record:\n${JSON.stringify(f, null, 2)}\nUse these sections: 1 Purpose, 2 Proposals and screening, 3 How the evaluation was done (with a weights table), 4 Results (ranking table), 5 What separates the proposals, 6 Sensitivity, 7 Evidence notes, 8 Recorded disagreement, 9 Decision (placeholder).`,
   schema: { type: 'object', properties: { markdown: str }, required: ['markdown'] },
   demo: demoMemo,
-  fromLive: (raw) => raw.markdown,
+  fromLive: (raw) => toText(raw?.markdown),
 };
 
 export const TASKS = { hierarchy, evidence, coach, discussion, sensitivity, memo };
@@ -190,40 +241,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function runTask<K extends TaskName>(name: K, input: In<K>, opts: AIOptions): Promise<AIResult<Out<K>>> {
   const def = TASKS[name] as unknown as TaskDef<In<K>, Out<K>>;
   const t0 = performance.now();
-  if (opts.mode === 'demo' || !opts.apiKey) {
+  if (opts.provider === 'demo') {
     await sleep(650 + Math.random() * 600);
     return { data: def.demo(input), source: 'demo', model: 'scripted demo', ms: performance.now() - t0 };
   }
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': opts.apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: opts.model,
-      max_tokens: 4096,
-      system: def.system,
-      messages: [{ role: 'user', content: def.user(input) }],
-      tools: [{ name: 'respond', description: `Return the result of: ${def.label}`, input_schema: def.schema }],
-      tool_choice: { type: 'tool', name: 'respond' },
-    }),
-  });
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`;
-    try {
-      const j = await res.json();
-      msg = j?.error?.message ?? msg;
-    } catch {
-      /* keep status text */
-    }
-    throw new Error(`Claude API: ${msg}`);
-  }
-  const body = await res.json();
-  const block = body?.content?.find((b: any) => b.type === 'tool_use');
-  if (!block) throw new Error('Claude API returned no structured result.');
-  const data = def.fromLive ? def.fromLive(block.input, input) : (block.input as Out<K>);
-  return { data, source: 'live', model: body.model ?? opts.model, ms: performance.now() - t0 };
+  const r = await callLLM(opts, opts.apiKey, { system: def.system, user: def.user(input), schema: def.schema, label: def.label });
+  const data = def.fromLive ? def.fromLive(r.data, input) : (r.data as Out<K>);
+  return { data, source: 'live', model: r.model, ms: performance.now() - t0 };
 }

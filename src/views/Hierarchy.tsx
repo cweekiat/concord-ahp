@@ -25,12 +25,11 @@ export default function Hierarchy() {
       <StepHeader
         eyebrow="Step 2 of 8"
         title="Build the criteria"
-        lede="An AHP hierarchy breaks the goal into criteria people can compare. The AI drafts one from the requirements document and shows where each criterion comes from."
-        ai={['Reads the requirements document and drafts criteria and sub-criteria', 'Pulls out threshold and objective values', 'Points out gaps and criteria that would be counted twice']}
-        human={['The team edits the draft in a workshop', 'The Program Manager approves the final hierarchy']}
+        ai={['Drafts criteria from the requirements', 'Flags gaps and double counting']}
+        human={['PM approves the hierarchy']}
       />
 
-      <Section title="Source: requirements document" subtitle="Fictional excerpt. This is all the AI is given.">
+      <Section title="Requirements document">
         <div className="card pad">
           <pre className="source">{REQUIREMENTS_DOC}</pre>
         </div>
@@ -40,7 +39,6 @@ export default function Hierarchy() {
         <Section>
           <div className="hstack">
             <AIButton busy={ai.busy} busyLabel="Drafting…" onClick={draftIt}>Draft hierarchy from requirements</AIButton>
-            <span className="footnote secondary">Usually takes about 12 hours of a lead’s time plus a workshop.</span>
           </div>
           <div style={{ marginTop: 12 }}><ErrorNote error={ai.error} /></div>
         </Section>
@@ -68,9 +66,9 @@ export default function Hierarchy() {
             }
           >
             <DraftView draft={draft} />
-            {state.aiMode === 'live' && (
+            {ai.live && (
               <p className="footnote secondary" style={{ marginTop: 12 }}>
-                Live mode: this draft came from Claude. The rest of the demo keeps its fixed 7-criterion structure so the later steps still line up. Use this draft to compare against the approved one below.
+                Live draft for comparison. The demo keeps its fixed 7-criterion structure.
               </p>
             )}
           </AICard>
@@ -83,7 +81,7 @@ export default function Hierarchy() {
             Criteria are fixed for this evaluation. Changing them later means every evaluator has to redo their judgments.
           </Callout>
           <div style={{ height: 20 }} />
-          <Section title="Approved hierarchy" subtitle="Each criterion has one owner, who checks its evidence and makes its detailed judgments.">
+          <Section title="Approved hierarchy">
             <div className="card">
               <ul className="tree">
                 {CRITERIA.map((c) => (

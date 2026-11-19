@@ -2,51 +2,100 @@
 
 **Live demo:** https://cweekiat.github.io/concord-ahp/
 
-Concord pairs the **Analytic Hierarchy Process (AHP)** with AI to help an acquisition team choose between complex engineering systems. The team might include performance engineers, reliability and logistics specialists, cost analysts, cyber leads and operators. The process follows DoD source selection practice.
+Concord runs a team **Analytic Hierarchy Process (AHP)** evaluation for complex acquisitions, following DoD source selection practice. The AI drafts and checks. People make every judgment, and the Source Selection Authority (SSA) signs the decision.
 
-> **The AI drafts and checks. People judge and decide.**
+## What's inside
 
-The AI never casts a judgment, never counts as an evaluator, and never selects a winner. Every AI output is a labelled suggestion that a named person accepts, edits or rejects, and every step is written to an audit log.
+- **8-step workflow**: set up → criteria → evidence → judgments → group view → scoring → results → decision.
+- **Management dashboard** with:
+  - progress KPIs and the outstanding actions for each owner
+  - an AHP hierarchy diagram (link width shows each criterion's contribution)
+  - a radar comparison of the proposals
+  - ranking, group weights, evaluator consistency, evidence status and disagreement charts
+  - AI oversight counts
+- **Demo scenario**: an EO/IR sensor for a maritime patrol UAS. Four fictional proposals and a nine-person team.
+- **Resources-saved model**: illustrative and editable.
+- **Audit log**: every AI suggestion and every human decision.
 
-## The demo: an EO/IR sensor for a maritime patrol UAS
+All scores and weights come from a deterministic, unit-tested engine (`src/ahp/engine.ts`). The AI only explains numbers the engine has already computed.
 
-Four fictional proposals are evaluated against a fictional requirements document by a nine-person team (eight evaluators plus the Source Selection Authority):
+## Use your own LLM
 
-| Step | AI prepares | People decide |
+Open **Settings → AI provider**, then pick a provider, model and key. **Test connection** checks the setup.
+
+| Provider | Endpoint | Key |
 |---|---|---|
-| 1 Set up | — | Goal, proposals, team and criterion owners |
-| 2 Criteria | Drafts the criteria tree from the CDD and flags gaps and double counting | PM approves the hierarchy |
-| 3 Evidence | Extracts 32 values from datasheets, converts units, quotes sources, flags conflicts | Owners verify each value; PM confirms KPP screening |
-| 4 Judgments | Finds the judgment behind an inconsistency (CR > 0.10) and explains it | Every pairwise judgment |
-| 5 Group view | Measures disagreement and drafts neutral discussion prompts | The team discusses; evaluators revise if persuaded |
-| 6 Scoring | — | Owners compare proposals on the criteria that have no numbers |
-| 7 Results | Finds the weights at which first place changes and explains them | Is the margin enough? |
-| 8 Decision | Drafts the Source Selection Decision Document | The SSA selects, writes the rationale and signs |
+| Demo (default) | none, offline scripted responses | — |
+| Anthropic Claude | `https://api.anthropic.com` | required |
+| OpenAI | `https://api.openai.com/v1` | required |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | required |
+| Ollama (local) | `http://localhost:11434/v1` | none |
+| LM Studio (local) | `http://localhost:1234/v1` | none |
+| Other OpenAI-compatible | any (vLLM, OpenRouter, an in-house gateway…) | optional |
 
-The scenario includes a deliberately inconsistent evaluator, two evaluators who disagree, a datasheet that gives both predicted and demonstrated MTBF, a weight quoted in pounds, and a proposal that fails a KPP. Each AI step has real work to do.
+- Calls go straight from your browser to the endpoint you choose. There is no Concord server.
+- **API key:** kept in memory by default. "Remember key on this device" stores it in this browser only.
+- **Not exported:** AI settings and keys are never included in evaluation exports.
+- **Untrusted output:** every live response is checked against a schema and coerced to the expected shape, because small models sometimes return malformed JSON.
 
-**Resources saved:** an editable, clearly labelled *illustrative* model puts the default scenario at about 122 → 44 person-hours (−64%) and 33 → 16 working days. Expert judgment time is kept the same on purpose.
-
-## How it works
-
-- `src/ahp/engine.ts` contains the deterministic AHP maths: principal eigenvector, consistency ratio, AIJ geometric-mean aggregation, consistency-fix search, threshold/objective value functions, and exact sensitivity crossovers. It has unit tests in `engine.test.ts`. **No number in the app comes from a language model.** The AI only explains numbers the engine computed.
-- `src/ai/tasks.ts` defines each AI task with a guardrailed system prompt and a strict JSON schema (forced tool use).
-  - **Demo mode** (default) uses scripted responses filled in with the live numbers.
-  - **Live mode** calls the Claude API from the browser with your own key. The key is held in memory only and never saved.
-- `src/data/` holds the fictional scenario, source documents and the savings model.
-- The design follows Apple's Human Interface Guidelines: system font stack, semantic colours in light, dark and increased contrast, grouped lists, sheets, segmented controls and 44 px targets. It honours reduced motion and reduced transparency. See [docs/HIG-REVIEW.md](docs/HIG-REVIEW.md).
-
-## Run locally
+**Local models:** Ollama must allow browser requests:
 
 ```bash
-npm install
-npm run dev     # http://localhost:5173/concord-ahp/
-npm test        # engine unit tests
-npm run build
+OLLAMA_ORIGINS="*" ollama serve
 ```
+
+In LM Studio, enable CORS in the server settings.
+
+## Run on your own laptop
+
+Requires Node 20+.
+
+```bash
+git clone https://github.com/cweekiat/concord-ahp.git
+```
+
+```bash
+cd concord-ahp && npm install
+```
+
+```bash
+npm run dev
+```
+
+Then open http://localhost:5173/concord-ahp/.
+
+To preset a provider, for example a local Ollama model, copy `.env.example` to `.env.local` and edit it:
+
+```bash
+cp .env.example .env.local
+```
+
+```
+VITE_LLM_PROVIDER=ollama
+VITE_LLM_BASE_URL=http://localhost:11434/v1
+VITE_LLM_MODEL=qwen2.5:7b
+VITE_LLM_API_KEY=            # local use only; never deploy a build containing a key
+```
+
+Other commands: `npm test` runs the engine and output-hardening tests, and `npm run build` builds a static site into `dist/`. You can host that folder anywhere, including an air-gapped intranet server next to a local model.
+
+## Deploy
 
 Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 
+## Design
+
+Concord follows Apple's Human Interface Guidelines:
+
+- system font and semantic colours
+- light, dark and increased-contrast modes
+- 44 px touch targets
+- support for reduced motion and reduced transparency
+
+Charts use a validated colour-blind-safe palette with legends, direct labels and a data table under each chart. See [docs/HIG-REVIEW.md](docs/HIG-REVIEW.md).
+
 ## Limitations
 
-This is a single-browser demonstration. A real deployment would need accounts and access control, accreditation for CUI, and an approved model-hosting environment. Everything in the demo is fictional: the programme, vendors, products, people and figures.
+- Concord runs in a single browser. Team members share an evaluation by exporting and importing a JSON file.
+- A real deployment needs accounts, access control, CUI accreditation and an approved model host.
+- All demo data is fictional.

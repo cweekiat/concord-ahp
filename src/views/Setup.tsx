@@ -9,11 +9,10 @@ export default function Setup() {
       <StepHeader
         eyebrow="Step 1 of 8"
         title="Set up the evaluation"
-        lede={`${PROGRAMME.name}: ${PROGRAMME.context}`}
-        human={['The Program Manager sets the goal and confirms which proposals are in play.', 'Each evaluator owns the criteria in their specialty.']}
+        lede={`${PROGRAMME.name} · Milestone C`}
       />
 
-      <Section title="Decision goal" subtitle="The question every judgment answers.">
+      <Section title="Decision goal">
         <div className="card pad">
           <label className="sr-only" htmlFor="goal">Decision goal</label>
           <textarea
@@ -27,7 +26,7 @@ export default function Setup() {
         </div>
       </Section>
 
-      <Section title="Proposals" subtitle="Four received. All fictional.">
+      <Section title="Proposals">
         <div className="grid-2">
           {ALTERNATIVES.map((a) => (
             <div className="card pad" key={a.id}>
@@ -44,7 +43,7 @@ export default function Setup() {
         </div>
       </Section>
 
-      <Section title="Evaluation team" subtitle="Switch persona in the toolbar to act as any of them. Each person can only change what they own." footer="Only the Source Selection Authority signs the decision. The SSA doesn’t weigh criteria, which keeps the decision separate from the evaluation.">
+      <Section title="Evaluation team" subtitle="Each person can change only what they own.">
         <div className="card">
           {EXPERTS.map((e) => (
             <div className="row" key={e.id}>

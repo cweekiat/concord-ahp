@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type ComponentType } from 'react';
 import { CR_LIMIT } from './ahp/engine';
 import { EXPERTS, expertById, type ExpertId } from './data/scenario';
-import { Badge, Button, ConfirmSheet, Icon, NavContext, Segmented, Sheet } from './components/ui';
-import { MODELS } from './ai/tasks';
+import { Badge, Button, ConfirmSheet, Icon, NavContext, Sheet, Toggle } from './components/ui';
+import { PROVIDERS, testConnection, type ProviderId } from './ai/providers';
 import { exportJSON, importJSON, initialState, preparedState, useStore } from './state/store';
 import type { StepId } from './state/types';
 import Overview from './views/Overview';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import Dashboard from './views/Dashboard';
+import { PROCESS, stepDone } from './state/progress';
 import Setup from './views/Setup';
 import Hierarchy from './views/Hierarchy';
 import Evidence from './views/Evidence';
@@ -19,20 +22,10 @@ import Audit from './views/Audit';
 import Method from './views/Method';
 
 const VIEWS: Record<StepId, ComponentType> = {
-  overview: Overview, setup: Setup, hierarchy: Hierarchy, evidence: Evidence, judgments: Judgments, group: Group,
+  overview: Overview, dashboard: Dashboard, setup: Setup, hierarchy: Hierarchy, evidence: Evidence, judgments: Judgments, group: Group,
   scoring: Scoring, results: Results, decision: Decision, savings: Savings, audit: Audit, method: Method,
 };
 
-const PROCESS: Array<{ id: StepId; label: string }> = [
-  { id: 'setup', label: 'Set up' },
-  { id: 'hierarchy', label: 'Criteria' },
-  { id: 'evidence', label: 'Evidence' },
-  { id: 'judgments', label: 'Judgments' },
-  { id: 'group', label: 'Group view' },
-  { id: 'scoring', label: 'Scoring' },
-  { id: 'results', label: 'Results' },
-  { id: 'decision', label: 'Decision' },
-];
 const REFERENCE: Array<{ id: StepId; label: string; icon: 'clock' | 'list' | 'book' }> = [
   { id: 'savings', label: 'Resources saved', icon: 'clock' },
   { id: 'audit', label: 'Audit log', icon: 'list' },
@@ -45,7 +38,7 @@ function readHash(): StepId {
 }
 
 export default function App() {
-  const { state, model, update, replace } = useStore();
+  const { state, model, update, replace, aiConfig } = useStore();
   const [confirmReset, setConfirmReset] = useState(false);
   const [step, setStep] = useState<StepId>(readHash);
   const [menu, setMenu] = useState(false);
@@ -80,7 +73,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const titles: Partial<Record<StepId, string>> = { overview: 'Concord: AHP with AI' };
+    const titles: Partial<Record<StepId, string>> = { overview: 'Concord: AHP with AI', dashboard: 'Dashboard · Concord' };
     document.title = titles[step] ?? `${[...PROCESS, ...REFERENCE].find((p) => p.id === step)?.label} · Concord`;
   }, [step]);
 
@@ -92,16 +85,7 @@ export default function App() {
     requestAnimationFrame(() => mainRef.current?.focus({ preventScroll: true }));
   };
 
-  const done: Partial<Record<StepId, boolean>> = {
-    setup: true,
-    hierarchy: state.hierarchy === 'approved',
-    evidence: model.evidenceVerified === model.evidenceTotal && state.screeningConfirmed,
-    judgments: model.individuals.every((x) => x.cr <= CR_LIMIT),
-    group: !!state.discussion.prompts && state.discussion.prompts.every((p, i) => state.discussion.done[`${p.criterion}-${i}`]),
-    scoring: model.ready,
-    results: !!state.sensitivityNote,
-    decision: !!state.decision,
-  };
+  const done = stepDone(state, model);
 
   const View = VIEWS[step];
   const me = expertById(state.persona);
@@ -123,6 +107,11 @@ export default function App() {
             <li>
               <button className="nav-item" aria-current={step === 'overview' ? 'page' : undefined} onClick={() => go('overview')}>
                 <span className="nav-icon"><Icon name="home" /></span> Overview
+              </button>
+            </li>
+            <li>
+              <button className="nav-item" aria-current={step === 'dashboard' ? 'page' : undefined} onClick={() => go('dashboard')}>
+                <span className="nav-icon"><Icon name="chart" /></span> Dashboard
               </button>
             </li>
           </ul>
@@ -168,14 +157,16 @@ export default function App() {
             </div>
             <span className="spacer" />
             <span className="mode-badge">
-              {state.aiMode === 'live' ? <Badge tone="indigo">Live AI</Badge> : <Badge>Demo AI</Badge>}
+              {aiConfig.provider !== 'demo' ? <Badge tone="indigo">{PROVIDERS[aiConfig.provider].label}</Badge> : <Badge>Demo AI</Badge>}
             </span>
             <Button variant="plain" small aria-label="Settings" onClick={() => setSettings(true)}>
               <Icon name="gear" size={22} />
             </Button>
           </header>
           <main id="main" className="content" ref={mainRef} tabIndex={-1} style={{ outline: 'none' }}>
-            <View />
+            <ErrorBoundary resetKey={step} onReset={() => update((s) => ({ ...s, sensitivityNote: null, memo: null, discussion: { ...s.discussion, prompts: null }, hierarchyDraft: s.hierarchy === 'drafted' ? null : s.hierarchyDraft, hierarchy: s.hierarchy === 'drafted' ? 'empty' : s.hierarchy }))}>
+              <View />
+            </ErrorBoundary>
           </main>
         </div>
       </div>
@@ -193,45 +184,18 @@ export default function App() {
 }
 
 function SettingsSheet({ open, onClose, go, onReset }: { open: boolean; onClose: () => void; go: (s: StepId) => void; onReset: () => void }) {
-  const { state, update, replace, apiKey, setApiKey } = useStore();
+  const { state, update, replace } = useStore();
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   return (
     <Sheet open={open} onClose={onClose} title="Settings">
       <div className="stack" style={{ gap: 24 }}>
-        <section className="stack">
-          <h3 className="headline">AI assistant</h3>
-          <Segmented
-            label="AI mode"
-            value={state.aiMode}
-            onChange={(v) => update((s) => ({ ...s, aiMode: v }))}
-            options={[{ value: 'demo', label: 'Demo (scripted)' }, { value: 'live', label: 'Live (Claude API)' }]}
-          />
-          {state.aiMode === 'demo' ? (
-            <p className="footnote secondary" style={{ margin: 0 }}>Demo responses were written for this fictional scenario and are filled in with the live numbers. No network calls, no key needed.</p>
-          ) : (
-            <>
-              <div className="field">
-                <label htmlFor="key">Your Anthropic API key</label>
-                <input id="key" className="input mono" type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…" value={apiKey} onChange={(e) => setApiKey(e.target.value.trim())} />
-              </div>
-              <div className="field">
-                <label htmlFor="model">Model</label>
-                <select id="model" className="plain" value={state.model} onChange={(e) => update((s) => ({ ...s, model: e.target.value }))}>
-                  {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
-              </div>
-              <p className="footnote secondary" style={{ margin: 0 }}>
-                Your browser calls the Claude API directly. The key is held in memory for this tab only: it is never saved or exported, and it’s gone when you reload. Use fictional data only. {apiKey ? '' : 'Without a key, demo responses are used.'}
-              </p>
-            </>
-          )}
-        </section>
+        <AISettings />
 
         <section className="stack">
           <h3 className="headline">Evaluation data</h3>
-          <p className="footnote secondary" style={{ margin: 0 }}>Saved in this browser. Export a file to share with your team; they can import it to pick up where you left off.</p>
+          <p className="footnote secondary" style={{ margin: 0 }}>Export to share with your team.</p>
           <div className="hstack">
             <Button onClick={() => {
               const url = URL.createObjectURL(new Blob([exportJSON(state)], { type: 'application/json' }));
@@ -258,5 +222,79 @@ function SettingsSheet({ open, onClose, go, onReset }: { open: boolean; onClose:
         </section>
       </div>
     </Sheet>
+  );
+}
+
+function AISettings() {
+  const { aiConfig, setAIConfig, apiKey, setApiKey, keyRemembered } = useStore();
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testing, setTesting] = useState(false);
+  const def = PROVIDERS[aiConfig.provider];
+
+  return (
+    <section className="stack">
+      <h3 className="headline">AI provider</h3>
+      <div className="field">
+        <label htmlFor="provider">Provider</label>
+        <select
+          id="provider"
+          className="plain"
+          value={aiConfig.provider}
+          onChange={(e) => {
+            const p = e.target.value as ProviderId;
+            setAIConfig({ provider: p, baseUrl: PROVIDERS[p].baseUrl, model: PROVIDERS[p].models[0] ?? '' });
+            setStatus(null);
+          }}
+        >
+          {(Object.keys(PROVIDERS) as ProviderId[]).map((p) => <option key={p} value={p}>{PROVIDERS[p].label}</option>)}
+        </select>
+      </div>
+      {def.wire !== 'demo' && (
+        <>
+          <div className="field">
+            <label htmlFor="base">Endpoint</label>
+            <input id="base" className="input mono" spellCheck={false} placeholder="https://…/v1" value={aiConfig.baseUrl} onChange={(e) => setAIConfig({ ...aiConfig, baseUrl: e.target.value.trim() })} />
+          </div>
+          <div className="field">
+            <label htmlFor="model">Model</label>
+            <input id="model" className="input mono" list="model-list" spellCheck={false} placeholder="Model name, e.g. llama3.1" value={aiConfig.model} onChange={(e) => setAIConfig({ ...aiConfig, model: e.target.value.trim() })} />
+            <datalist id="model-list">{def.models.map((m) => <option key={m} value={m} />)}</datalist>
+          </div>
+          {def.key !== 'none' && (
+            <>
+              <div className="field">
+                <label htmlFor="key">API key{def.key === 'optional' ? ' (if required)' : ''}</label>
+                <input id="key" className="input mono" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(e) => setApiKey(e.target.value.trim())} />
+              </div>
+              <div className="row" style={{ padding: 0, minHeight: 44 }}>
+                <span className="grow subhead">Remember key on this device</span>
+                <Toggle checked={keyRemembered} label="Remember API key on this device" onChange={(v) => setApiKey(apiKey, v)} />
+              </div>
+            </>
+          )}
+          {def.note && <p className="footnote secondary" style={{ margin: 0 }}>{def.note}</p>}
+          <div className="hstack">
+            <Button
+              disabled={testing}
+              onClick={async () => {
+                setTesting(true);
+                setStatus(null);
+                try {
+                  setStatus({ ok: true, text: await testConnection(aiConfig, apiKey) });
+                } catch (e) {
+                  setStatus({ ok: false, text: e instanceof Error ? e.message : String(e) });
+                } finally {
+                  setTesting(false);
+                }
+              }}
+            >
+              {testing ? 'Testing…' : 'Test connection'}
+            </Button>
+            {status && <span role="status" className="footnote" style={{ color: status.ok ? 'var(--green-text)' : 'var(--red-text)' }}>{status.text}</span>}
+          </div>
+          <p className="footnote secondary" style={{ margin: 0 }}>Calls go straight from this browser to the endpoint. Use fictional data on public deployments.</p>
+        </>
+      )}
+    </section>
   );
 }

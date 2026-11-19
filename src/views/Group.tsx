@@ -5,6 +5,7 @@ import { WeightBars } from '../components/charts';
 import { AICard, AIButton, Avatar, Badge, Button, ErrorNote, Pager, Provenance, Section, StepHeader, Toggle, pct, useAI, useNav } from '../components/ui';
 import { useStore } from '../state/store';
 import type { DiscussionPrompt } from '../state/types';
+import { toText } from '../ai/tasks';
 import { CRBadge } from './Judgments';
 
 export default function Group() {
@@ -39,12 +40,11 @@ export default function Group() {
       <StepHeader
         eyebrow="Step 5 of 8"
         title="See where the team agrees"
-        lede="Individual judgments are combined with a geometric mean (AIJ), the standard way to aggregate a group in AHP. Disagreement is useful information: it shows where evaluators are picturing different missions."
-        ai={['Measures how far apart evaluators are on each criterion', 'Drafts neutral questions that bring out the assumptions behind each view', 'Never averages people out of the discussion']}
-        human={['The team discusses the real disagreements', 'Evaluators revise their own judgments if they’re persuaded', 'The chair decides whether inconsistent matrices count']}
+        ai={['Drafts discussion prompts']}
+        human={['Team discusses; evaluators revise']}
       />
 
-      <Section title="Group criteria weights" action={<CRBadge cr={model.groupCR} />} subtitle={`From ${model.included.length} of ${model.individuals.length} evaluators.`}>
+      <Section title="Group weights" action={<CRBadge cr={model.groupCR} />} subtitle={`${model.included.length}/${model.individuals.length} evaluators`}>
         <div className="card" style={{ padding: '8px 0' }}>
           <WeightBars items={CRITERIA.map((c, i) => ({ label: c.short, value: model.W[i], color: c.color }))} />
         </div>
@@ -54,7 +54,6 @@ export default function Group() {
               <div>Leave out evaluators whose CR is over 0.10</div>
               <div className="footnote secondary">
                 {inconsistent.length ? `Right now that’s ${inconsistent.map((x) => x.expert.name).join(', ')}. ` : 'Every evaluator is within the limit right now. '}
-                Ask them to revise first. Leaving someone out is a judgment call for the chair.
               </div>
             </div>
             <Toggle
@@ -69,7 +68,7 @@ export default function Group() {
         </div>
       </Section>
 
-      <Section title="Who weighs what" subtitle="Each evaluator’s weights. Darker cells mean more weight.">
+      <Section title="Weights by evaluator">
         <div className="card table-wrap">
           <table className="data heat">
             <thead>
@@ -101,7 +100,7 @@ export default function Group() {
         </div>
       </Section>
 
-      <Section title="Biggest disagreements" subtitle="Ranked by spread (coefficient of variation) across evaluators.">
+      <Section title="Biggest disagreements">
         <div className="card">
           {model.divergence.slice(0, 3).map((d) => (
             <div className="row" key={d.criterion}>
@@ -123,7 +122,6 @@ export default function Group() {
           <>
             <div className="hstack">
               <AIButton busy={ai.busy} busyLabel="Drafting…" onClick={draftPrompts}>Draft discussion prompts</AIButton>
-              <span className="footnote secondary">Usually a facilitator spends most of a day preparing this.</span>
             </div>
             <ErrorNote error={ai.error} />
           </>
@@ -152,8 +150,8 @@ export default function Group() {
                         })}
                       </span>
                     </div>
-                    <p style={{ margin: '8px 0 4px' }}>{p.question}</p>
-                    <p className="footnote secondary" style={{ margin: 0 }}>{p.why}</p>
+                    <p style={{ margin: '8px 0 4px' }}>{toText(p.question)}</p>
+                    <p className="footnote secondary" style={{ margin: 0 }}>{toText(p.why)}</p>
                     <div className="field" style={{ marginTop: 10 }}>
                       <label htmlFor={`note-${key}`}>Outcome (recorded in the decision document)</label>
                       <textarea

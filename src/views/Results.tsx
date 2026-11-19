@@ -6,6 +6,7 @@ import { AICard, AIButton, Badge, Button, ErrorNote, Gate, Pager, Provenance, Se
 import { useStore } from '../state/store';
 import { reversals } from '../state/sensitivity';
 import type { SensitivityNote } from '../state/types';
+import { toText } from '../ai/tasks';
 
 export function sensitivityFacts(model: ReturnType<typeof useStore>['model']) {
   const names = model.active.map((a) => altById(a).name);
@@ -31,7 +32,7 @@ export default function Results() {
   if (!model.ready) {
     return (
       <>
-        <StepHeader eyebrow="Step 7 of 8" title="Results and sensitivity" lede="Results appear once the earlier steps are finished." />
+        <StepHeader eyebrow="Step 7 of 8" title="Results and sensitivity" lede="Finish the earlier steps first." />
         <Gate blockers={model.blockers} />
         <Pager here="results" />
       </>
@@ -60,12 +61,11 @@ export default function Results() {
       <StepHeader
         eyebrow="Step 7 of 8"
         title="Results and sensitivity"
-        lede="The overall score combines the group’s criteria weights with each proposal’s scores. A ranking is only as good as its margin, so check how much the weights would have to change before first place changes."
-        ai={['Finds every weight at which the ranking would change', 'Explains in plain English how robust the result is']}
-        human={['The team decides whether the margin is big enough to rely on', 'The SSA weighs anything the model doesn’t capture']}
+        ai={['Finds weights that change the winner']}
+        human={['Judge whether the margin holds']}
       />
 
-      <Section title="Overall ranking" subtitle="Bar segments show how much each criterion contributes.">
+      <Section title="Overall ranking">
         <div className="card">
           {model.ranking.map((r, i) => {
             const ai = model.active.indexOf(r.alt);
@@ -95,7 +95,7 @@ export default function Results() {
         </div>
       </Section>
 
-      <Section title="What if the weights were different?" subtitle="Choose a criterion. Its weight runs from 0 to 100% while the others keep their proportions.">
+      <Section title="Sensitivity">
         <div style={{ marginBottom: 10 }}>
           <label className="sr-only" htmlFor="crit">Criterion</label>
           <select id="crit" className="plain" value={crit} onChange={(e) => setCrit(e.target.value as CriterionId)}>
@@ -133,9 +133,9 @@ export default function Results() {
             provenance={<Provenance result={result} step="results" />}
             footer={<Button variant="gray" onClick={() => update((s) => ({ ...s, sensitivityNote: null }))}>Discard</Button>}
           >
-            <p style={{ marginTop: 0 }}>{state.sensitivityNote.summary}</p>
+            <p style={{ marginTop: 0 }}>{toText(state.sensitivityNote.summary)}</p>
             <ul style={{ marginBottom: 0, paddingLeft: 18 }} className="subhead">
-              {state.sensitivityNote.bullets.map((b) => <li key={b}>{b}</li>)}
+              {(state.sensitivityNote.bullets ?? []).map(toText).map((b, i) => <li key={i}>{b}</li>)}
             </ul>
           </AICard>
         )}

@@ -164,18 +164,18 @@ export function Avatar({ initials, large }: { initials: string; large?: boolean 
   );
 }
 
-export function StepHeader({ eyebrow, title, lede, ai, human }: { eyebrow?: string; title: string; lede: ReactNode; ai?: string[]; human?: string[] }) {
+export function StepHeader({ eyebrow, title, lede, ai, human }: { eyebrow?: string; title: string; lede?: ReactNode; ai?: string[]; human?: string[] }) {
   return (
     <header className="step-header">
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
       <h1 className="large-title">{title}</h1>
-      <p className="lede">{lede}</p>
+      {lede && <p className="lede">{lede}</p>}
       {(ai || human) && (
         <div className="roles">
           {ai && (
             <div className="role-card ai">
               <h3>
-                <Icon name="sparkles" size={16} /> AI prepares
+                <Icon name="sparkles" size={16} /> AI
               </h3>
               <ul>{ai.map((x) => <li key={x}>{x}</li>)}</ul>
             </div>
@@ -183,7 +183,7 @@ export function StepHeader({ eyebrow, title, lede, ai, human }: { eyebrow?: stri
           {human && (
             <div className="role-card human">
               <h3>
-                <Icon name="person" size={16} /> People decide
+                <Icon name="person" size={16} /> People
               </h3>
               <ul>{human.map((x) => <li key={x}>{x}</li>)}</ul>
             </div>
@@ -221,7 +221,7 @@ export function Gate({ blockers }: { blockers: string[] }) {
 
 const ORDER: StepId[] = ['overview', 'setup', 'hierarchy', 'evidence', 'judgments', 'group', 'scoring', 'results', 'decision', 'savings'];
 const LABEL: Record<StepId, string> = {
-  overview: 'Overview', setup: 'Set up', hierarchy: 'Criteria', evidence: 'Evidence', judgments: 'Judgments', group: 'Group view',
+  overview: 'Overview', dashboard: 'Dashboard', setup: 'Set up', hierarchy: 'Criteria', evidence: 'Evidence', judgments: 'Judgments', group: 'Group view',
   scoring: 'Scoring', results: 'Results', decision: 'Decision', savings: 'Resources saved', audit: 'Audit log', method: 'Method',
 };
 export function Pager({ here }: { here: StepId }) {
@@ -247,14 +247,14 @@ export function Pager({ here }: { here: StepId }) {
 
 /* ---------------- AI ---------------- */
 export function useAI() {
-  const { state, apiKey } = useStore();
+  const { aiConfig, apiKey } = useStore();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function run<K extends TaskName>(name: K, input: Parameters<typeof runTask<K>>[1]): Promise<AIResult<any> | null> {
     setBusy(true);
     setError(null);
     try {
-      return await runTask(name, input, { mode: state.aiMode, apiKey, model: state.model });
+      return await runTask(name, input, { ...aiConfig, apiKey });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       return null;
@@ -262,7 +262,7 @@ export function useAI() {
       setBusy(false);
     }
   }
-  return { run, busy, error, live: state.aiMode === 'live' && !!apiKey };
+  return { run, busy, error, live: aiConfig.provider !== 'demo' };
 }
 
 export function AIButton({ busy, children, onClick, disabled, busyLabel = 'Working…' }: { busy: boolean; children: ReactNode; onClick: () => void; disabled?: boolean; busyLabel?: string }) {
@@ -308,7 +308,7 @@ export function ErrorNote({ error }: { error: string | null }) {
   if (!error) return null;
   return (
     <Callout tone="warn" icon="warn" title="The AI request failed">
-      {error}. Nothing was changed. You can try again, or switch to demo mode in Settings.
+      {error} Nothing was changed. Try again, or check Settings.
     </Callout>
   );
 }

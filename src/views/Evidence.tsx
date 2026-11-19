@@ -21,7 +21,7 @@ export default function Evidence() {
   if (state.hierarchy !== 'approved') {
     return (
       <>
-        <StepHeader eyebrow="Step 3 of 8" title="Gather the evidence" lede="Approve the criteria first, so the AI knows what to look for." />
+        <StepHeader eyebrow="Step 3 of 8" title="Gather the evidence" lede="Approve the criteria first." />
         <Gate blockers={['The criteria hierarchy has not been approved.']} />
         <Pager here="evidence" />
       </>
@@ -69,16 +69,14 @@ export default function Evidence() {
       <StepHeader
         eyebrow="Step 3 of 8"
         title="Gather the evidence"
-        lede="Every score has to trace back to a source. The AI builds the comparison table from the vendors’ documents. Each criterion’s owner checks it before anything is scored."
-        ai={['Reads 4 vendor documents plus the government cost estimate', 'Converts units, quotes the source, rates its confidence', 'Flags conflicting figures and threshold breaches']}
-        human={['Owners verify or correct every value', 'Program Manager confirms which proposals fail a KPP and are screened out']}
+        ai={['Extracts values with source quotes', 'Flags conflicts and KPP breaches']}
+        human={['Owners verify each value', 'PM confirms screening']}
       />
 
       {!extracted && (
         <Section>
           <div className="hstack">
             <AIButton busy={ai.busy} busyLabel="Extracting…" onClick={extract}>Extract values from documents</AIButton>
-            <span className="footnote secondary">32 values from 5 documents.</span>
           </div>
           <div style={{ marginTop: 12 }}><ErrorNote error={ai.error} /></div>
         </Section>
@@ -88,7 +86,7 @@ export default function Evidence() {
         <>
           <Section
             title="Evidence table"
-            subtitle={`${model.evidenceVerified} of ${model.evidenceTotal} values verified. Select a value to see its source.`}
+            subtitle={`${model.evidenceVerified}/${model.evidenceTotal} verified`}
             action={
               myUnflagged.length > 0 ? (
                 <Button small onClick={verifyMine}>
@@ -152,7 +150,7 @@ export default function Evidence() {
             </Section>
           )}
 
-          <Section title="Screening against KPP thresholds" subtitle="A proposal that misses a Key Performance Parameter threshold is removed before scoring.">
+          <Section title="KPP screening">
             <div className="card">
               {model.screening.map((x) => (
                 <div className="row" key={x.alt}>
@@ -183,7 +181,7 @@ export default function Evidence() {
         </>
       )}
 
-      <Section title="Source documents" subtitle="Fictional. Life-cycle cost comes from the government estimate, not from vendors.">
+      <Section title="Source documents">
         <div style={{ marginBottom: 10 }}>
           <Segmented label="Source document" value={doc} onChange={setDoc} options={ALTERNATIVES.map((a) => ({ value: a.id, label: a.name }))} />
         </div>

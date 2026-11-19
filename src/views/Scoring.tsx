@@ -10,7 +10,7 @@ export default function Scoring() {
   if (!model.ready) {
     return (
       <>
-        <StepHeader eyebrow="Step 6 of 8" title="Score the proposals" lede="Scoring needs approved criteria, verified evidence and confirmed screening." />
+        <StepHeader eyebrow="Step 6 of 8" title="Score the proposals" lede="Finish the earlier steps first." />
         <Gate blockers={model.blockers} />
         <Pager here="scoring" />
       </>
@@ -21,11 +21,10 @@ export default function Scoring() {
       <StepHeader
         eyebrow="Step 6 of 8"
         title="Score the proposals"
-        lede="Measured criteria use a value function: a proposal at the threshold scores 0.1 and one at the objective scores 1.0, with no extra credit past the objective. Judged criteria use the owners’ head-to-head comparisons. Each criterion’s scores add up to 100%."
-        human={['Owners set threshold and objective values (from the requirements document)', 'Owners make the head-to-head comparisons on judged criteria']}
+        lede="Measured: threshold = 0.1, objective = 1.0. Judged: owner comparisons."
       />
       {CRITERIA.map((c) => (
-        <Section key={c.id} title={<span className="hstack"><i className="dot" style={{ background: c.color }} />{c.name}</span>} subtitle={`Owner: ${expertById(c.owner).role}`}>
+        <Section key={c.id} title={<span className="hstack"><i className="dot" style={{ background: c.color }} />{c.name}</span>}>
           <div className="card table-wrap">
             <table className="data">
               <thead>

@@ -18,7 +18,7 @@ export default function Audit() {
   const who = (a: AuditEntry['actor']) => (a === 'ai' ? 'AI assistant' : a === 'system' ? 'System' : `${expertById(a).name} (${expertById(a).role})`);
   return (
     <>
-      <StepHeader eyebrow="Reference" title="Audit log" lede="Every AI suggestion and every human decision, with who did it and when. It’s exported with the evaluation, so reviewers can trace any number back to its source." />
+      <StepHeader eyebrow="Reference" title="Audit log"  />
       <div style={{ marginBottom: 12 }}>
         <Segmented label="Filter entries" value={filter} onChange={setFilter} options={[{ value: 'all', label: `All (${state.audit.length})` }, { value: 'ai', label: 'AI' }, { value: 'human', label: 'People' }]} />
       </div>

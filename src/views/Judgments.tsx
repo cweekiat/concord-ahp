@@ -20,7 +20,7 @@ export default function Judgments() {
   if (state.hierarchy !== 'approved') {
     return (
       <>
-        <StepHeader eyebrow="Step 4 of 8" title="Make judgments" lede="Approve the criteria first. Judgments compare criteria, so the criteria need to be fixed." />
+        <StepHeader eyebrow="Step 4 of 8" title="Make judgments" lede="Approve the criteria first." />
         <Pager here="judgments" />
       </>
     );
@@ -31,12 +31,12 @@ export default function Judgments() {
       <StepHeader
         eyebrow="Step 4 of 8"
         title="Make judgments"
-        lede="Each evaluator compares the criteria two at a time, on their own: which matters more for this mission, and by how much? Owners also compare the sub-criteria and the proposals within their specialty."
-        ai={['Checks consistency on every change (the maths is deterministic, not AI)', 'If CR goes over 0.10, finds the judgment causing it and explains why', 'Never sets a judgment, and never counts as a voter']}
-        human={['Every judgment, made by each evaluator on their own', 'Whether to accept, partly accept or reject the coach’s suggestion']}
+        lede="Drag toward the item that matters more."
+        ai={['Finds the cause of inconsistency']}
+        human={['Every judgment']}
       />
 
-      <Section title="Team status" subtitle="Judgments were submitted independently before this session. Select a person to act as them.">
+      <Section title="Team status">
         <div className="card">
           {model.individuals.map((x) => (
             <div className="row" key={x.expert.id}>
@@ -138,14 +138,11 @@ function CriteriaMatrix() {
     <>
       <Section
         title={`${me.name}’s criteria comparisons`}
-        subtitle="Drag toward the criterion that matters more. The further you drag, the stronger the preference."
         action={<CRBadge cr={c.cr} />}
       >
         {c.cr > CR_LIMIT && !coach && (
           <div style={{ marginBottom: 12 }}>
-            <Callout tone="warn" icon="warn" title="These judgments contradict each other" action={<AIButton busy={ai.busy} busyLabel="Analysing…" onClick={runCoach}>Find the cause</AIButton>}>
-              A consistency ratio above 0.10 usually means one comparison was entered the wrong way round, not that your views are wrong.
-            </Callout>
+            <Callout tone="warn" icon="warn" title="Inconsistent judgments (CR > 0.10)" action={<AIButton busy={ai.busy} busyLabel="Analysing…" onClick={runCoach}>Find the cause</AIButton>} />
             <ErrorNote error={ai.error} />
           </div>
         )}
@@ -177,7 +174,7 @@ function CriteriaMatrix() {
           ))}
         </div>
       </Section>
-      <Section title="Your resulting weights" subtitle="Computed live from your comparisons (principal eigenvector).">
+      <Section title="Resulting weights">
         <div className="card" style={{ padding: '8px 0' }}>
           <WeightBars items={CRITERIA.map((cr, i) => ({ label: cr.short, value: c.weights[i], color: cr.color }))} />
         </div>
@@ -196,7 +193,7 @@ function SubCriteria() {
         const upper = state.area[c.id] ?? [];
         const cc = consistency(buildMatrix(c.leaves.length, upper));
         return (
-          <Section key={c.id} title={c.name} subtitle={`Owned by ${expertById(c.owner).name}, ${expertById(c.owner).role}${owner ? ' (you)' : '. Read-only for you.'}`} action={<CRBadge cr={cc.cr} />}>
+          <Section key={c.id} title={c.name} subtitle={owner ? undefined : `Read-only · owned by ${expertById(c.owner).role}`} action={<CRBadge cr={cc.cr} />}>
             <div className="card">
               {pairIndex(c.leaves.length).map(([i, j], k) => (
                 <PairwiseRow
@@ -223,7 +220,6 @@ function SubCriteria() {
           </Section>
         );
       })}
-      <p className="footnote secondary">Cost, Interoperability, Risk and Cyber each have a single sub-criterion, so there’s nothing to compare inside them.</p>
     </>
   );
 }
@@ -232,18 +228,13 @@ function QualAlternatives() {
   const { state, update, log } = useStore();
   return (
     <>
-      <Callout title="Only for criteria without numbers">
-        Measured criteria are scored from the verified evidence with a threshold-to-objective value function, so there’s nothing to judge there.
-        Interoperability, programme risk and cyber have no single number, so their owners compare the proposals directly.
-      </Callout>
-      <div style={{ height: 16 }} />
       {QUAL_LEAVES.map((l) => {
         const cr = leafCriterion(l.id);
         const owner = cr.owner === state.persona;
         const upper = state.qual[l.id];
         const cc = consistency(buildMatrix(ALTERNATIVES.length, upper));
         return (
-          <Section key={l.id} title={`${cr.short}: ${l.name}`} subtitle={`${l.description} Owned by ${expertById(cr.owner).name}${owner ? ' (you)' : '. Read-only for you.'}`} action={<CRBadge cr={cc.cr} />}>
+          <Section key={l.id} title={`${cr.short}: ${l.name}`} subtitle={owner ? undefined : `Read-only · owned by ${expertById(cr.owner).role}`} action={<CRBadge cr={cc.cr} />}>
             <div className="card">
               {pairIndex(ALTERNATIVES.length).map(([i, j], k) => (
                 <PairwiseRow

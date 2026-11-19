@@ -23,12 +23,8 @@ export default function Savings() {
       <StepHeader
         eyebrow="Reference"
         title="Resources saved"
-        lede="An illustrative planning model comparing a manual AHP source selection with the AI-assisted process. Change the inputs to match your programme."
+        lede="Illustrative model. Edit the assumptions below."
       />
-      <Callout tone="warn" icon="info" title="These are planning assumptions, not measurements">
-        Each estimate shows how it was worked out. Expert judgment time is kept the same on purpose. Concord saves time on preparation, paperwork and meetings, not on thinking.
-      </Callout>
-      <div style={{ height: 20 }} />
 
       <div className="grid-3" style={{ marginBottom: 28 }}>
         <div className="card stat">
@@ -48,7 +44,7 @@ export default function Savings() {
         </div>
       </div>
 
-      <Section title="By task" subtitle="Grey bar: manual. Indigo bar: AI-assisted.">
+      <Section title="By task" subtitle="Grey: manual · Indigo: AI-assisted">
         <div className="card">
           {t.rows.map((r) => (
             <div className="row" key={r.id} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>

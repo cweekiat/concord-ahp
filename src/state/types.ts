@@ -2,6 +2,7 @@ import type { AltId, CriterionId, ExpertId } from '../data/scenario';
 
 export type StepId =
   | 'overview'
+  | 'dashboard'
   | 'setup'
   | 'hierarchy'
   | 'evidence'
@@ -70,7 +71,7 @@ export interface AuditEntry {
 }
 
 export interface State {
-  v: 3;
+  v: 4;
   persona: ExpertId;
   goal: string;
   hierarchy: 'empty' | 'drafted' | 'approved';
@@ -85,8 +86,6 @@ export interface State {
   sensitivityNote: SensitivityNote | null;
   memo: string | null;
   decision: Decision | null;
-  aiMode: 'demo' | 'live';
-  model: string;
   audit: AuditEntry[];
 }
 

@@ -5,14 +5,14 @@ import { totals, DEFAULT_SAVINGS } from '../data/savings';
 import type { StepId } from '../state/types';
 
 const FLOW: Array<{ step: StepId; n: number; title: string; ai: string; human: string }> = [
-  { step: 'setup', n: 1, title: 'Set up', ai: '—', human: 'Define the goal, proposals and evaluation team' },
-  { step: 'hierarchy', n: 2, title: 'Criteria', ai: 'Drafts the criteria tree from the requirements document, citing each paragraph', human: 'Program Manager approves the hierarchy' },
-  { step: 'evidence', n: 3, title: 'Evidence', ai: 'Pulls values out of datasheets, converts units and flags anything doubtful', human: 'Criterion owners check each value; KPP screening is confirmed' },
-  { step: 'judgments', n: 4, title: 'Judgments', ai: 'Finds the judgment behind an inconsistency and explains it', human: 'Every pairwise judgment, made by each evaluator on their own' },
-  { step: 'group', n: 5, title: 'Group view', ai: 'Shows where people disagree and drafts questions for the discussion', human: 'The team talks it through; evaluators revise if they choose' },
-  { step: 'scoring', n: 6, title: 'Scoring', ai: '—', human: 'Owners compare proposals on the criteria that have no numbers' },
-  { step: 'results', n: 7, title: 'Results', ai: 'Explains which weight changes would change the ranking', human: 'The team checks whether the result holds up' },
-  { step: 'decision', n: 8, title: 'Decision', ai: 'Drafts the decision document with every number traced to its source', human: 'The Source Selection Authority decides and signs' },
+  { step: 'setup', n: 1, title: 'Set up', ai: '—', human: 'Goal, proposals, team' },
+  { step: 'hierarchy', n: 2, title: 'Criteria', ai: 'Drafts criteria from requirements', human: 'PM approves' },
+  { step: 'evidence', n: 3, title: 'Evidence', ai: 'Extracts and flags datasheet values', human: 'Owners verify; PM confirms screening' },
+  { step: 'judgments', n: 4, title: 'Judgments', ai: 'Finds the cause of inconsistency', human: 'Every pairwise judgment' },
+  { step: 'group', n: 5, title: 'Group view', ai: 'Drafts discussion prompts', human: 'Team discusses and revises' },
+  { step: 'scoring', n: 6, title: 'Scoring', ai: '—', human: 'Owners compare judged criteria' },
+  { step: 'results', n: 7, title: 'Results', ai: 'Explains rank-change points', human: 'Judge robustness' },
+  { step: 'decision', n: 8, title: 'Decision', ai: 'Drafts the decision document', human: 'SSA decides and signs' },
 ];
 
 export default function Overview() {
@@ -25,12 +25,9 @@ export default function Overview() {
   return (
     <>
       <div className="hero">
-        <p className="eyebrow">Analytic Hierarchy Process · AI-assisted · Demo</p>
-        <h1>Better team decisions on complex buys, with AI doing the groundwork.</h1>
-        <p className="lede">
-          Concord runs a structured AHP evaluation for an acquisition team: performance engineers, reliability and logistics specialists, cost analysts and operators.
-          The AI reads documents, checks the maths and drafts the paperwork. It never judges or decides.
-        </p>
+        <p className="eyebrow">Demo · Project TERN EO/IR sensor</p>
+        <h1>Concord</h1>
+        <p className="lede">Team AHP evaluation for complex acquisitions, with AI doing the groundwork.</p>
         <div className="hstack">
           <Button variant="filled" onClick={() => go(started ? 'hierarchy' : 'setup')}>
             {started ? 'Continue the walkthrough' : 'Start the walkthrough'} <Icon name="chevronRight" />
@@ -47,8 +44,6 @@ export default function Overview() {
         </div>
       </div>
 
-      <p className="principle">The AI drafts and checks. People judge and decide.</p>
-
       <div className="grid-3" style={{ marginBottom: 28 }}>
         <div className="card stat">
           <div className="label">Demo scenario</div>
@@ -63,11 +58,10 @@ export default function Overview() {
         <div className="card stat">
           <div className="label">Expert judgment time</div>
           <div className="value">Unchanged</div>
-          <div className="footnote secondary">Kept the same on purpose. That’s the part people own.</div>
         </div>
       </div>
 
-      <Section title="How the work is split" subtitle="Eight screens cover the full AHP process, following DoD source selection practice.">
+      <Section title="How the work is split">
         <div className="card table-wrap">
           <table className="data">
             <thead>
@@ -94,26 +88,26 @@ export default function Overview() {
         </div>
       </Section>
 
-      <Section title="Where it fits in DoD acquisition">
+      <Section title="DoD mapping">
         <div className="card table-wrap">
           <table className="data">
             <thead>
               <tr><th scope="col">DoD construct</th><th scope="col">In Concord</th></tr>
             </thead>
             <tbody>
-              <tr><td>Capability Development Document (KPPs, KSAs)</td><td>Source for the criteria; thresholds become screening rules and value functions</td></tr>
+              <tr><td>Capability Development Document (KPPs, KSAs)</td><td>Criteria, thresholds, screening</td></tr>
               <tr><td>Evaluation factors and subfactors</td><td>AHP criteria hierarchy</td></tr>
-              <tr><td>Source Selection Evaluation Board (SSEB)</td><td>Evaluators, each owning the criteria in their specialty</td></tr>
-              <tr><td>Source Selection Advisory Council (SSAC)</td><td>Group view: aggregation, disagreement and sensitivity</td></tr>
-              <tr><td>Source Selection Authority (SSA)</td><td>Makes and signs the decision; may depart from the ranking with a written rationale</td></tr>
-              <tr><td>Source Selection Decision Document</td><td>AI drafts it, people edit it, and it’s exported with a full audit log</td></tr>
+              <tr><td>Source Selection Evaluation Board (SSEB)</td><td>Evaluators owning criteria</td></tr>
+              <tr><td>Source Selection Advisory Council (SSAC)</td><td>Group view and results</td></tr>
+              <tr><td>Source Selection Authority (SSA)</td><td>Signs the decision</td></tr>
+              <tr><td>Source Selection Decision Document</td><td>AI draft, human edit, audit log</td></tr>
             </tbody>
           </table>
         </div>
       </Section>
 
       <p className="footnote secondary">
-        Everything in this demo is fictional: the programme, vendors, products, people and numbers. AI responses are scripted unless you add your own Claude API key in Settings.
+        All data is fictional.
         {started && (
           <>
             {' '}

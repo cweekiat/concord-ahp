@@ -10,17 +10,19 @@ import {
   leafCriterion,
 } from '../data/scenario';
 import { DEMO_EXTRACTION, DEMO_HIERARCHY } from '../ai/demo';
+import { ENV_API_KEY, defaultAIConfig, type AIConfig } from '../ai/providers';
 import type { AuditEntry, AuditKind, State, StepId } from './types';
 import { cellKey } from './types';
 import { computeModel, type Model } from './derive';
 
-const KEY = 'concord-ahp/state/v3';
+const KEY = 'concord-ahp/state/v4';
+const AI_KEY = 'concord-ahp/ai-config';
+const KEY_KEY = 'concord-ahp/api-key';
 
-export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 export function initialState(): State {
   return {
-    v: 3,
+    v: 4,
     persona: 'pm',
     goal: PROGRAMME.goal,
     hierarchy: 'empty',
@@ -35,8 +37,6 @@ export function initialState(): State {
     sensitivityNote: null,
     memo: null,
     decision: null,
-    aiMode: 'demo',
-    model: DEFAULT_MODEL,
     audit: [
       {
         id: 'seed',
@@ -91,7 +91,7 @@ function load(): State | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as State;
-    return s && s.v === 3 ? s : null;
+    return s && s.v === 4 ? s : null;
   } catch {
     return null;
   }
@@ -110,15 +110,60 @@ interface Store {
   replace: (s: State) => void;
   log: (kind: AuditKind, step: StepId, summary: string, actor?: AuditEntry['actor']) => void;
   apiKey: string;
-  setApiKey: (k: string) => void;
+  setApiKey: (k: string, remember?: boolean) => void;
+  keyRemembered: boolean;
+  aiConfig: AIConfig;
+  setAIConfig: (c: AIConfig) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => load() ?? initialState());
-  // Held in memory only — never written to storage, never exported.
-  const [apiKey, setApiKey] = useState('');
+  // AI settings belong to this device, not to the evaluation: never exported.
+  const [aiConfig, setAIConfigState] = useState<AIConfig>(() => {
+    try {
+      const raw = localStorage.getItem(AI_KEY);
+      if (raw) return { ...defaultAIConfig(), ...JSON.parse(raw) };
+    } catch {
+      /* ignore */
+    }
+    return defaultAIConfig();
+  });
+  const setAIConfig = useCallback((c: AIConfig) => {
+    setAIConfigState(c);
+    try {
+      localStorage.setItem(AI_KEY, JSON.stringify(c));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  // API key: memory only unless the user opts in to remembering it on this device.
+  const [keyRemembered, setKeyRemembered] = useState(() => {
+    try {
+      return !!localStorage.getItem(KEY_KEY);
+    } catch {
+      return false;
+    }
+  });
+  const [apiKey, setApiKeyState] = useState(() => {
+    try {
+      return localStorage.getItem(KEY_KEY) || ENV_API_KEY;
+    } catch {
+      return ENV_API_KEY;
+    }
+  });
+  const setApiKey = useCallback((k: string, remember?: boolean) => {
+    setApiKeyState(k);
+    const keep = remember ?? keyRemembered;
+    setKeyRemembered(keep);
+    try {
+      if (keep && k) localStorage.setItem(KEY_KEY, k);
+      else localStorage.removeItem(KEY_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [keyRemembered]);
 
   useEffect(() => {
     try {
@@ -137,7 +182,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
   const model = useMemo(() => computeModel(state), [state]);
 
-  return <Ctx.Provider value={{ state, model, update, replace, log, apiKey, setApiKey }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ state, model, update, replace, log, apiKey, setApiKey, keyRemembered, aiConfig, setAIConfig }}>{children}</Ctx.Provider>;
 }
 
 export function useStore(): Store {
@@ -153,8 +198,9 @@ export function exportJSON(s: State): string {
 export function importJSON(text: string): State {
   const parsed = JSON.parse(text);
   const s = parsed?.state ?? parsed;
-  if (!s || s.v !== 3 || !s.judgments) throw new Error('This file is not a Concord evaluation.');
-  return s as State;
+  if (!s || !s.judgments || (s.v !== 3 && s.v !== 4)) throw new Error('This file is not a Concord evaluation.');
+  const { aiMode: _a, model: _m, ...rest } = s;
+  return { ...rest, v: 4 } as State;
 }
 
 export { stamp, ALTERNATIVES };
