@@ -19,32 +19,35 @@ Concord runs a team **Analytic Hierarchy Process (AHP)** evaluation for complex 
 
 All scores and weights come from a deterministic, unit-tested engine (`src/ahp/engine.ts`). The AI only explains numbers the engine has already computed.
 
-## Use your own LLM
+## AI: live by default
 
-Open **Settings → AI provider**, then pick a provider, model and key. **Test connection** checks the setup.
+Open **Settings → AI** and paste a key. The provider is detected automatically.
 
-| Provider | Endpoint | Key |
-|---|---|---|
-| Demo (default) | none, offline scripted responses | — |
-| Anthropic Claude | `https://api.anthropic.com` | required |
-| OpenAI | `https://api.openai.com/v1` | required |
-| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | required |
-| Ollama (local) | `http://localhost:11434/v1` | none |
-| LM Studio (local) | `http://localhost:1234/v1` | none |
-| Other OpenAI-compatible | any (vLLM, OpenRouter, an in-house gateway…) | optional |
+| You paste | Uses |
+|---|---|
+| nothing | Local **Ollama `qwen2.5:7b`** (`OLLAMA_ORIGINS="*" ollama serve`) |
+| `sk-ant-…` | **Claude Haiku 5.5** |
+| `sk-…` | OpenAI |
+| `AIza…` | Google Gemini |
 
-- Calls go straight from your browser to the endpoint you choose. There is no Concord server.
-- **API key:** kept in memory by default. "Remember key on this device" stores it in this browser only.
-- **Not exported:** AI settings and keys are never included in evaluation exports.
-- **Untrusted output:** every live response is checked against a schema and coerced to the expected shape, because small models sometimes return malformed JSON.
+- **Demo mode** (scripted, offline) is a switch in Settings.
+- **Other endpoints:** *Advanced* lets you pick any provider, endpoint or model, such as LM Studio, vLLM, OpenRouter or an in-house gateway.
+- **Keys:** kept in memory unless you choose "Remember key on this device", and never exported.
+- **Untrusted replies:** every live AI response is checked and coerced to the expected shape before it's shown.
 
-**Local models:** Ollama must allow browser requests:
+## Working as a team (no accounts)
 
-```bash
-OLLAMA_ORIGINS="*" ollama serve
-```
+1. The PM opens **Share** (toolbar), enters a name and email, and emails each colleague an **invite link** for their role.
+2. Each colleague opens the link, joins as that role, and does their part: judgments, verifying evidence, comparisons.
+3. They press **Share → Email my input**. This sends a short **response link** containing only their contribution, with a checksum.
+4. The PM opens each response link and presses **Merge**. The audit log records who sent what, from which email, and when.
 
-In LM Studio, enable CORS in the server settings.
+Links carry the data in the URL fragment. Nothing goes to a server. Identities are self-declared. See [docs/ROLLOUT.md](docs/ROLLOUT.md) for the path to verified accounts.
+
+## Demo video and tour
+
+- **Watch demo (30 s)** on the Overview. The source is in `docs/demo/` and was rendered from `docs/demo/storyboard.json` with the `product-demo-video` Claude skill.
+- **Take the tour** (10 steps) from the Overview or from Settings.
 
 ## Run on your own laptop
 

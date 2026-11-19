@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type ComponentType } from 'react';
 import { CR_LIMIT } from './ahp/engine';
 import { EXPERTS, expertById, type ExpertId } from './data/scenario';
 import { Badge, Button, ConfirmSheet, Icon, NavContext, Sheet, Toggle } from './components/ui';
-import { PROVIDERS, testConnection, type ProviderId } from './ai/providers';
+import { PROVIDERS, describeConfig, testConnection, type ProviderId } from './ai/providers';
 import { exportJSON, importJSON, initialState, preparedState, useStore } from './state/store';
 import type { StepId } from './state/types';
 import Overview from './views/Overview';
+import { IncomingLink, ShareSheet } from './components/Share';
+import { Tour } from './components/Tour';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Dashboard from './views/Dashboard';
 import { PROCESS, stepDone } from './state/progress';
@@ -33,8 +35,14 @@ const REFERENCE: Array<{ id: StepId; label: string; icon: 'clock' | 'list' | 'bo
 ];
 
 function readHash(): StepId {
-  const h = window.location.hash.replace(/^#\/?/, '') as StepId;
+  const h = window.location.hash.replace(/^#\/?/, '').split('?')[0] as StepId;
   return h in VIEWS ? h : 'overview';
+}
+
+/** #/join?d=… or #/merge?d=… — shared links. */
+function readIncoming(): string | null {
+  const m = window.location.hash.match(/^#\/(join|merge)\?d=([A-Za-z0-9_-]+)/);
+  return m ? m[2] : null;
 }
 
 export default function App() {
@@ -43,6 +51,9 @@ export default function App() {
   const [step, setStep] = useState<StepId>(readHash);
   const [menu, setMenu] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [share, setShare] = useState(false);
+  const [tour, setTour] = useState<number | null>(null);
+  const [incoming, setIncoming] = useState<string | null>(readIncoming);
   const mainRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 900px)').matches);
@@ -67,7 +78,11 @@ export default function App() {
   }, [menu]);
 
   useEffect(() => {
-    const on = () => setStep(readHash());
+    const on = () => {
+      setStep(readHash());
+      const d = readIncoming();
+      if (d) setIncoming(d);
+    };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
@@ -91,7 +106,7 @@ export default function App() {
   const me = expertById(state.persona);
 
   return (
-    <NavContext.Provider value={{ go, current: step }}>
+    <NavContext.Provider value={{ go, current: step, openSettings: () => setSettings(true), openShare: () => setShare(true), startTour: () => setTour(0) }}>
       <a href="#main" className="skip-link" onClick={(e) => { e.preventDefault(); mainRef.current?.focus(); }}>Skip to content</a>
       <div className="shell">
         {menu && <div className="scrim" onClick={() => setMenu(false)} aria-hidden />}
@@ -157,8 +172,11 @@ export default function App() {
             </div>
             <span className="spacer" />
             <span className="mode-badge">
-              {aiConfig.provider !== 'demo' ? <Badge tone="indigo">{PROVIDERS[aiConfig.provider].label}</Badge> : <Badge>Demo AI</Badge>}
+              {aiConfig.provider !== 'demo' ? <Badge tone="indigo">{aiConfig.provider === 'ollama' ? `Local · ${aiConfig.model}` : aiConfig.model}</Badge> : <Badge>Demo AI</Badge>}
             </span>
+            <Button variant="plain" small aria-label="Share" onClick={() => setShare(true)}>
+              <Icon name="share" size={22} />
+            </Button>
             <Button variant="plain" small aria-label="Settings" onClick={() => setSettings(true)}>
               <Icon name="gear" size={22} />
             </Button>
@@ -170,7 +188,19 @@ export default function App() {
           </main>
         </div>
       </div>
-      <SettingsSheet open={settings} onClose={() => setSettings(false)} go={go} onReset={() => setConfirmReset(true)} />
+      <SettingsSheet open={settings} onClose={() => setSettings(false)} go={go} onReset={() => setConfirmReset(true)} onTour={() => { setSettings(false); setTour(0); }} />
+      <ShareSheet open={share} onClose={() => setShare(false)} />
+      {incoming && (
+        <IncomingLink
+          data={incoming}
+          onDone={() => {
+            setIncoming(null);
+            history.replaceState(null, '', `${location.pathname}#/overview`);
+            setStep('overview');
+          }}
+        />
+      )}
+      {tour !== null && <Tour step={tour} go={go} onStep={setTour} onEnd={() => setTour(null)} />}
       <ConfirmSheet
         open={confirmReset}
         title="Start Over?"
@@ -183,7 +213,7 @@ export default function App() {
   );
 }
 
-function SettingsSheet({ open, onClose, go, onReset }: { open: boolean; onClose: () => void; go: (s: StepId) => void; onReset: () => void }) {
+function SettingsSheet({ open, onClose, go, onReset, onTour }: { open: boolean; onClose: () => void; go: (s: StepId) => void; onReset: () => void; onTour: () => void }) {
   const { state, update, replace } = useStore();
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -214,6 +244,14 @@ function SettingsSheet({ open, onClose, go, onReset }: { open: boolean; onClose:
         </section>
 
         <section className="stack">
+          <h3 className="headline">Help</h3>
+          <div className="hstack">
+            <Button variant="filled" onClick={onTour}>Take the tour</Button>
+            <span className="footnote secondary">10 steps</span>
+          </div>
+        </section>
+
+        <section className="stack">
           <h3 className="headline">Demo shortcuts</h3>
           <div className="hstack">
             <Button onClick={() => { update((s) => preparedState(s)); onClose(); go('judgments'); }}>Skip to judgments</Button>
@@ -226,53 +264,34 @@ function SettingsSheet({ open, onClose, go, onReset }: { open: boolean; onClose:
 }
 
 function AISettings() {
-  const { aiConfig, setAIConfig, apiKey, setApiKey, keyRemembered } = useStore();
+  const { aiConfig, aiSettings, setAISettings, apiKey, setApiKey, keyRemembered } = useStore();
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [testing, setTesting] = useState(false);
-  const def = PROVIDERS[aiConfig.provider];
+  const set = (patch: Partial<typeof aiSettings>) => {
+    setAISettings({ ...aiSettings, ...patch });
+    setStatus(null);
+  };
 
   return (
     <section className="stack">
-      <h3 className="headline">AI provider</h3>
-      <div className="field">
-        <label htmlFor="provider">Provider</label>
-        <select
-          id="provider"
-          className="plain"
-          value={aiConfig.provider}
-          onChange={(e) => {
-            const p = e.target.value as ProviderId;
-            setAIConfig({ provider: p, baseUrl: PROVIDERS[p].baseUrl, model: PROVIDERS[p].models[0] ?? '' });
-            setStatus(null);
-          }}
-        >
-          {(Object.keys(PROVIDERS) as ProviderId[]).map((p) => <option key={p} value={p}>{PROVIDERS[p].label}</option>)}
-        </select>
+      <h3 className="headline">AI</h3>
+      <div className="row" style={{ padding: 0, minHeight: 44 }}>
+        <span className="grow">Demo mode <span className="footnote secondary">· scripted, offline</span></span>
+        <Toggle checked={aiSettings.demo} label="Demo mode" onChange={(v) => set({ demo: v })} />
       </div>
-      {def.wire !== 'demo' && (
+      {!aiSettings.demo && (
         <>
           <div className="field">
-            <label htmlFor="base">Endpoint</label>
-            <input id="base" className="input mono" spellCheck={false} placeholder="https://…/v1" value={aiConfig.baseUrl} onChange={(e) => setAIConfig({ ...aiConfig, baseUrl: e.target.value.trim() })} />
+            <label htmlFor="key">API key</label>
+            <input id="key" className="input mono" type="password" autoComplete="off" spellCheck={false} placeholder="Paste a Claude key (sk-ant-…), or leave empty for local" value={apiKey} onChange={(e) => { setApiKey(e.target.value.trim()); setStatus(null); }} />
+            <span className="footnote secondary">Using {describeConfig(aiConfig)}</span>
           </div>
-          <div className="field">
-            <label htmlFor="model">Model</label>
-            <input id="model" className="input mono" list="model-list" spellCheck={false} placeholder="Model name, e.g. llama3.1" value={aiConfig.model} onChange={(e) => setAIConfig({ ...aiConfig, model: e.target.value.trim() })} />
-            <datalist id="model-list">{def.models.map((m) => <option key={m} value={m} />)}</datalist>
-          </div>
-          {def.key !== 'none' && (
-            <>
-              <div className="field">
-                <label htmlFor="key">API key{def.key === 'optional' ? ' (if required)' : ''}</label>
-                <input id="key" className="input mono" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(e) => setApiKey(e.target.value.trim())} />
-              </div>
-              <div className="row" style={{ padding: 0, minHeight: 44 }}>
-                <span className="grow subhead">Remember key on this device</span>
-                <Toggle checked={keyRemembered} label="Remember API key on this device" onChange={(v) => setApiKey(apiKey, v)} />
-              </div>
-            </>
+          {apiKey && (
+            <div className="row" style={{ padding: 0, minHeight: 44 }}>
+              <span className="grow subhead">Remember key on this device</span>
+              <Toggle checked={keyRemembered} label="Remember API key on this device" onChange={(v) => setApiKey(apiKey, v)} />
+            </div>
           )}
-          {def.note && <p className="footnote secondary" style={{ margin: 0 }}>{def.note}</p>}
           <div className="hstack">
             <Button
               disabled={testing}
@@ -292,7 +311,35 @@ function AISettings() {
             </Button>
             {status && <span role="status" className="footnote" style={{ color: status.ok ? 'var(--green-text)' : 'var(--red-text)' }}>{status.text}</span>}
           </div>
-          <p className="footnote secondary" style={{ margin: 0 }}>Calls go straight from this browser to the endpoint. Use fictional data on public deployments.</p>
+          <details>
+            <summary className="footnote" style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', color: 'var(--tint-text)' }}>Advanced: other providers and endpoints</summary>
+            <div className="stack" style={{ paddingTop: 4 }}>
+              <div className="row" style={{ padding: 0, minHeight: 44 }}>
+                <span className="grow subhead">Detect provider from key</span>
+                <Toggle checked={aiSettings.auto} label="Detect provider from key" onChange={(v) => set({ auto: v, ...(v ? {} : { provider: aiConfig.provider, baseUrl: aiConfig.baseUrl, model: aiConfig.model }) })} />
+              </div>
+              {!aiSettings.auto && (
+                <>
+                  <div className="field">
+                    <label htmlFor="provider">Provider</label>
+                    <select id="provider" className="plain" value={aiSettings.provider} onChange={(e) => { const p = e.target.value as ProviderId; set({ provider: p, baseUrl: PROVIDERS[p].baseUrl, model: PROVIDERS[p].models[0] ?? '' }); }}>
+                      {(Object.keys(PROVIDERS) as ProviderId[]).filter((p) => p !== 'demo').map((p) => <option key={p} value={p}>{PROVIDERS[p].label}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="base">Endpoint</label>
+                    <input id="base" className="input mono" spellCheck={false} value={aiSettings.baseUrl} onChange={(e) => set({ baseUrl: e.target.value.trim() })} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="model">Model</label>
+                    <input id="model" className="input mono" list="model-list" spellCheck={false} value={aiSettings.model} onChange={(e) => set({ model: e.target.value.trim() })} />
+                    <datalist id="model-list">{PROVIDERS[aiSettings.provider].models.map((m) => <option key={m} value={m} />)}</datalist>
+                  </div>
+                </>
+              )}
+              <p className="footnote secondary" style={{ margin: 0 }}>Local models need browser access: <code>OLLAMA_ORIGINS="*" ollama serve</code>. Calls go straight from this browser to the provider.</p>
+            </div>
+          </details>
         </>
       )}
     </section>

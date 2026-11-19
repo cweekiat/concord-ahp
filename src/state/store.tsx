@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import {
   ALTERNATIVES,
   PROGRAMME,
@@ -10,13 +10,19 @@ import {
   leafCriterion,
 } from '../data/scenario';
 import { DEMO_EXTRACTION, DEMO_HIERARCHY } from '../ai/demo';
-import { ENV_API_KEY, defaultAIConfig, type AIConfig } from '../ai/providers';
+import { ENV_API_KEY, defaultAISettings, effectiveConfig, type AIConfig, type AISettings } from '../ai/providers';
 import type { AuditEntry, AuditKind, State, StepId } from './types';
 import { cellKey } from './types';
 import { computeModel, type Model } from './derive';
 
 const KEY = 'concord-ahp/state/v4';
-const AI_KEY = 'concord-ahp/ai-config';
+const AI_KEY = 'concord-ahp/ai-settings';
+const ME_KEY = 'concord-ahp/me';
+
+export interface Identity {
+  name: string;
+  email: string;
+}
 const KEY_KEY = 'concord-ahp/api-key';
 
 
@@ -112,8 +118,12 @@ interface Store {
   apiKey: string;
   setApiKey: (k: string, remember?: boolean) => void;
   keyRemembered: boolean;
+  /** Resolved config for calls (settings + key). */
   aiConfig: AIConfig;
-  setAIConfig: (c: AIConfig) => void;
+  aiSettings: AISettings;
+  setAISettings: (c: AISettings) => void;
+  me: Identity;
+  setMe: (m: Identity) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -121,19 +131,35 @@ const Ctx = createContext<Store | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => load() ?? initialState());
   // AI settings belong to this device, not to the evaluation: never exported.
-  const [aiConfig, setAIConfigState] = useState<AIConfig>(() => {
+  const [aiSettings, setAISettingsState] = useState<AISettings>(() => {
     try {
       const raw = localStorage.getItem(AI_KEY);
-      if (raw) return { ...defaultAIConfig(), ...JSON.parse(raw) };
+      if (raw) return { ...defaultAISettings(), ...JSON.parse(raw) };
     } catch {
       /* ignore */
     }
-    return defaultAIConfig();
+    return defaultAISettings();
   });
-  const setAIConfig = useCallback((c: AIConfig) => {
-    setAIConfigState(c);
+  const setAISettings = useCallback((c: AISettings) => {
+    setAISettingsState(c);
     try {
       localStorage.setItem(AI_KEY, JSON.stringify(c));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  // Who is using this browser — stamped on audit entries and on responses sent back by email.
+  const [me, setMeState] = useState<Identity>(() => {
+    try {
+      return { name: '', email: '', ...JSON.parse(localStorage.getItem(ME_KEY) || '{}') };
+    } catch {
+      return { name: '', email: '' };
+    }
+  });
+  const setMe = useCallback((m: Identity) => {
+    setMeState(m);
+    try {
+      localStorage.setItem(ME_KEY, JSON.stringify(m));
     } catch {
       /* ignore */
     }
@@ -175,14 +201,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const update = useCallback((fn: (s: State) => State) => dispatch({ type: 'update', fn }), []);
   const replace = useCallback((s: State) => dispatch({ type: 'replace', state: s }), []);
+  const meRef = useRef(me);
+  meRef.current = me;
   const log = useCallback(
     (kind: AuditKind, step: StepId, summary: string, actor?: AuditEntry['actor']) =>
-      dispatch({ type: 'update', fn: (s) => ({ ...s, audit: [...s.audit, stamp({ actor: actor ?? s.persona, kind, step, summary })] }) }),
+      dispatch({
+        type: 'update',
+        fn: (s) => ({ ...s, audit: [...s.audit, stamp({ actor: actor ?? s.persona, kind, step, summary, by: actor === 'ai' || actor === 'system' ? undefined : meRef.current.email || undefined })] }),
+      }),
     [],
   );
+  const aiConfig = useMemo(() => effectiveConfig(aiSettings, apiKey), [aiSettings, apiKey]);
   const model = useMemo(() => computeModel(state), [state]);
 
-  return <Ctx.Provider value={{ state, model, update, replace, log, apiKey, setApiKey, keyRemembered, aiConfig, setAIConfig }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ state, model, update, replace, log, apiKey, setApiKey, keyRemembered, aiConfig, aiSettings, setAISettings, me, setMe }}>{children}</Ctx.Provider>;
 }
 
 export function useStore(): Store {

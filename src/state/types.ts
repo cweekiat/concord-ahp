@@ -68,6 +68,8 @@ export interface AuditEntry {
   kind: AuditKind;
   step: StepId;
   summary: string;
+  /** Email of the person at the keyboard (self-declared unless accounts are added). */
+  by?: string;
 }
 
 export interface State {

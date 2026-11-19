@@ -409,3 +409,10 @@ mark { background: color-mix(in srgb, var(--yellow) 45%, transparent); color: in
   .dash-grid { grid-template-columns: 1fr; }
   .stepper { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ---------- Guided tour ---------- */
+.tour { position: fixed; inset: 0; z-index: 90; pointer-events: none; }
+.tour-scrim { position: absolute; inset: 0; pointer-events: auto; }
+.tour-spot { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); transition: all 0.25s ease; pointer-events: none; outline: 2px solid var(--tint); }
+.tour-card { position: fixed; background: var(--bg-elevated); color: var(--label); border-radius: 14px; padding: 14px 16px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3); pointer-events: auto; outline: none; }
+.tour:not(:has(.tour-spot)) .tour-scrim { background: rgba(0, 0, 0, 0.45); }

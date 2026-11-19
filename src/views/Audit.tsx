@@ -33,7 +33,7 @@ export default function Audit() {
               </div>
               <div className="grow">
                 <div className="subhead">{e.summary}</div>
-                <div className="footnote secondary">{who(e.actor)} · {e.step}</div>
+                <div className="footnote secondary">{who(e.actor)}{e.by ? ` · ${e.by}` : ''} · {e.step}</div>
               </div>
             </div>
           ))}

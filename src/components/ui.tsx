@@ -5,13 +5,13 @@ import { runTask, type AIResult, type TaskName } from '../ai/tasks';
 import { savingFor } from '../data/savings';
 
 /* ---------------- Navigation context ---------------- */
-export const NavContext = createContext<{ go: (s: StepId) => void; current: StepId }>({ go: () => {}, current: 'overview' });
+export const NavContext = createContext<{ go: (s: StepId) => void; current: StepId; openSettings: () => void; openShare: () => void; startTour: () => void }>({ go: () => {}, current: 'overview', openSettings: () => {}, openShare: () => {}, startTour: () => {} });
 export const useNav = () => useContext(NavContext);
 
 /* ---------------- Icons (simple strokes, SF-Symbols-like) ---------------- */
 type IconName =
   | 'sparkles' | 'person' | 'check' | 'chevronRight' | 'chevronLeft' | 'sidebar' | 'doc' | 'chart' | 'gear'
-  | 'clock' | 'list' | 'scale' | 'flag' | 'xmark' | 'info' | 'tree' | 'people' | 'table' | 'slider' | 'signature' | 'book' | 'home' | 'warn' | 'download' | 'upload';
+  | 'clock' | 'list' | 'scale' | 'flag' | 'xmark' | 'info' | 'tree' | 'people' | 'table' | 'slider' | 'signature' | 'book' | 'home' | 'warn' | 'download' | 'upload' | 'share';
 
 const PATHS: Record<IconName, string> = {
   sparkles: 'M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3zM18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z',
@@ -39,6 +39,7 @@ const PATHS: Record<IconName, string> = {
   warn: 'M12 4l9 16H3zM12 10v4m0 3v.01',
   download: 'M12 4v11m0 0l-4-4m4 4l4-4M5 20h14',
   upload: 'M12 16V5m0 0L8 9m4-4l4 4M5 20h14',
+  share: 'M12 3v12M8 7l4-4 4 4M7 10H5v11h14V10h-2',
 };
 
 export function Icon({ name, size = 18, label }: { name: IconName; size?: number; label?: string }) {
@@ -305,11 +306,25 @@ export function AICard({ title, provenance, children, footer }: { title: string;
 }
 
 export function ErrorNote({ error }: { error: string | null }) {
+  const { aiSettings, setAISettings } = useStore();
+  const { openSettings } = useNav();
   if (!error) return null;
   return (
-    <Callout tone="warn" icon="warn" title="The AI request failed">
-      {error} Nothing was changed. Try again, or check Settings.
-    </Callout>
+    <div style={{ marginTop: 12 }}>
+      <Callout
+        tone="warn"
+        icon="warn"
+        title="The AI request failed"
+        action={
+          <span className="hstack">
+            <Button small variant="gray" onClick={openSettings}>Settings</Button>
+            <Button small onClick={() => setAISettings({ ...aiSettings, demo: true })}>Use demo</Button>
+          </span>
+        }
+      >
+        {error} Nothing was changed.
+      </Callout>
+    </div>
   );
 }
 

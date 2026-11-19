@@ -20,17 +20,31 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
     label: 'Anthropic Claude',
     wire: 'anthropic',
     baseUrl: 'https://api.anthropic.com',
-    models: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5'],
+    models: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
     key: 'required',
   },
-  openai: { label: 'OpenAI', wire: 'openai', baseUrl: 'https://api.openai.com/v1', models: [], key: 'required' },
-  gemini: { label: 'Google Gemini', wire: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', models: [], key: 'required' },
-  ollama: { label: 'Ollama (local)', wire: 'openai', baseUrl: 'http://localhost:11434/v1', models: [], key: 'none', note: 'Start with OLLAMA_ORIGINS="*" ollama serve' },
+  openai: { label: 'OpenAI', wire: 'openai', baseUrl: 'https://api.openai.com/v1', models: ['gpt-4o-mini'], key: 'required' },
+  gemini: { label: 'Google Gemini', wire: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', models: ['gemini-2.5-flash'], key: 'required' },
+  ollama: { label: 'Ollama (local)', wire: 'openai', baseUrl: 'http://localhost:11434/v1', models: ['qwen2.5:7b', 'qwen2.5:14b'], key: 'none', note: 'Start with OLLAMA_ORIGINS="*" ollama serve' },
   lmstudio: { label: 'LM Studio (local)', wire: 'openai', baseUrl: 'http://localhost:1234/v1', models: [], key: 'none', note: 'Enable CORS in the LM Studio server settings' },
   custom: { label: 'Other OpenAI-compatible', wire: 'openai', baseUrl: '', models: [], key: 'optional', note: 'vLLM, OpenRouter, Azure gateway, in-house endpoint…' },
 };
 
+/** What the network layer needs for one call. */
 export interface AIConfig {
+  provider: ProviderId;
+  baseUrl: string;
+  model: string;
+}
+
+/**
+ * What the user sets. Default: live, auto. With auto on, pasting a key picks the provider
+ * (sk-ant- → Claude Haiku 5.5, AIza → Gemini, sk- → OpenAI); no key → local Ollama qwen2.5:7b.
+ * "Advanced" turns auto off and exposes provider, endpoint and model.
+ */
+export interface AISettings {
+  demo: boolean;
+  auto: boolean;
   provider: ProviderId;
   baseUrl: string;
   model: string;
@@ -38,15 +52,33 @@ export interface AIConfig {
 
 const env = import.meta.env;
 
-/** Defaults can be set in `.env.local` when running on your own machine. */
-export function defaultAIConfig(): AIConfig {
-  const p = (env.VITE_LLM_PROVIDER as ProviderId) || 'demo';
-  const provider: ProviderId = p in PROVIDERS ? p : 'demo';
-  return {
-    provider,
-    baseUrl: (env.VITE_LLM_BASE_URL as string) || PROVIDERS[provider].baseUrl,
-    model: (env.VITE_LLM_MODEL as string) || PROVIDERS[provider].models[0] || '',
-  };
+export function defaultAISettings(): AISettings {
+  const p = env.VITE_LLM_PROVIDER as ProviderId | undefined;
+  if (p && p in PROVIDERS && p !== 'demo') {
+    return { demo: false, auto: false, provider: p, baseUrl: (env.VITE_LLM_BASE_URL as string) || PROVIDERS[p].baseUrl, model: (env.VITE_LLM_MODEL as string) || PROVIDERS[p].models[0] || '' };
+  }
+  return { demo: p === 'demo', auto: true, provider: 'ollama', baseUrl: PROVIDERS.ollama.baseUrl, model: 'qwen2.5:7b' };
+}
+
+export function detectProvider(key: string): ProviderId {
+  const k = key.trim();
+  if (!k) return 'ollama';
+  if (k.startsWith('sk-ant-')) return 'anthropic';
+  if (k.startsWith('AIza')) return 'gemini';
+  if (k.startsWith('sk-')) return 'openai';
+  return 'anthropic';
+}
+
+/** Resolve settings + key into the concrete call config. */
+export function effectiveConfig(s: AISettings, apiKey: string): AIConfig {
+  if (s.demo) return { provider: 'demo', baseUrl: '', model: '' };
+  if (!s.auto) return { provider: s.provider, baseUrl: s.baseUrl, model: s.model };
+  const provider = detectProvider(apiKey);
+  return { provider, baseUrl: PROVIDERS[provider].baseUrl, model: PROVIDERS[provider].models[0] ?? '' };
+}
+
+export function describeConfig(c: AIConfig): string {
+  return c.provider === 'demo' ? 'Demo (scripted)' : `${PROVIDERS[c.provider].label} · ${c.model}`;
 }
 
 export const ENV_API_KEY = (env.VITE_LLM_API_KEY as string) || '';
@@ -129,7 +161,11 @@ export async function callLLM(cfg: AIConfig, apiKey: string, spec: CallSpec): Pr
     // Some local servers reject response_format — retry without it.
     if (res.status === 400 || res.status === 422) res = await send(false);
   } catch (e) {
-    throw new Error(`${def.label}: can’t reach ${base}. ${def.note ?? 'Check the URL and that the server allows browser (CORS) requests.'}`);
+    throw new Error(
+      cfg.provider === 'ollama'
+        ? `No local model at ${base}. Paste an API key in Settings, or start Ollama with OLLAMA_ORIGINS="*" ollama serve.`
+        : `${def.label}: can’t reach ${base}. Check the endpoint and that it allows browser (CORS) requests.`,
+    );
   }
   if (!res.ok) throw await failure(res, def.label);
   const body = await res.json();

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, ConfirmSheet, Icon, Pager, Section, useNav } from '../components/ui';
+import { Button, ConfirmSheet, Icon, Pager, Section, Sheet, useNav } from '../components/ui';
 import { initialState, preparedState, useStore } from '../state/store';
 import { totals, DEFAULT_SAVINGS } from '../data/savings';
 import type { StepId } from '../state/types';
@@ -16,10 +16,11 @@ const FLOW: Array<{ step: StepId; n: number; title: string; ai: string; human: s
 ];
 
 export default function Overview() {
-  const { go } = useNav();
+  const { go, startTour } = useNav();
   const { state, replace, update } = useStore();
   const t = totals(DEFAULT_SAVINGS);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [video, setVideo] = useState(false);
   const started = state.hierarchy !== 'empty' || Object.keys(state.evidence).length > 0;
 
   return (
@@ -41,6 +42,8 @@ export default function Overview() {
           >
             Skip to judgments
           </Button>
+          <Button variant="plain" onClick={() => setVideo(true)}>▶︎ Watch demo (30 s)</Button>
+          <Button variant="plain" onClick={startTour}>Take the tour</Button>
         </div>
       </div>
 
@@ -117,6 +120,12 @@ export default function Overview() {
           </>
         )}
       </p>
+      <Sheet open={video} onClose={() => setVideo(false)} title="Concord in 30 seconds">
+        <video controls autoPlay playsInline preload="metadata" poster={`${import.meta.env.BASE_URL}demo/poster.png`} style={{ width: '100%', borderRadius: 10, display: 'block', background: '#000' }}>
+          <source src={`${import.meta.env.BASE_URL}demo/concord-demo.mp4`} type="video/mp4" />
+          <track kind="captions" src={`${import.meta.env.BASE_URL}demo/captions.vtt`} srcLang="en" label="English" default />
+        </video>
+      </Sheet>
       <ConfirmSheet
         open={confirmReset}
         title="Start Over?"
