@@ -3,3 +3,12 @@ dist
 .DS_Store
 .env.local
 .env.*.local
+
+# Build process and planning notes: kept local, not published
+PLAN.md
+docs/HIG-REVIEW.md
+docs/ROLLOUT.md
+docs/demo/storyboard.json
+docs/demo/timeline.json
+CLAUDE.md
+.claude/

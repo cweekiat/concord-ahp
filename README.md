@@ -4,7 +4,7 @@
 
 ![Concord demo: AI drafts criteria, the consistency coach flags a judgment, the dashboard updates](docs/readme/demo.gif)
 
-**[▶ Watch the 30-second demo](docs/demo/demo.mp4)** · By [cweekiat](https://cweekiat.github.io/)
+**[▶ Watch the 30-second demo](docs/demo/demo.mp4)** · [More projects](https://cweekiat.github.io/)
 
 ![Three Concord screens: build the criteria, consistency coach, management dashboard](docs/readme/screens.png)
 
@@ -48,11 +48,11 @@ Open **Settings → AI** and paste a key. The provider is detected automatically
 3. They press **Share → Email my input**. This sends a short **response link** containing only their contribution, with a checksum.
 4. The PM opens each response link and presses **Merge**. The audit log records who sent what, from which email, and when.
 
-Links carry the data in the URL fragment. Nothing goes to a server. Identities are self-declared. See [docs/ROLLOUT.md](docs/ROLLOUT.md) for the path to verified accounts.
+Links carry the data in the URL fragment. Nothing goes to a server. Identities are self-declared.
 
 ## Demo video and tour
 
-- **Watch demo (30 s)** on the Overview. The source is in `docs/demo/` and was rendered from `docs/demo/storyboard.json` with the `product-demo-video` Claude skill.
+- **Watch demo (30 s)** on the Overview. The video is in `docs/demo/`.
 - **Take the tour** (10 steps) from the Overview or from Settings.
 
 ## Run on your own laptop
@@ -101,7 +101,7 @@ Concord follows Apple's Human Interface Guidelines:
 - 44 px touch targets
 - support for reduced motion and reduced transparency
 
-Charts use a validated colour-blind-safe palette with legends, direct labels and a data table under each chart. See [docs/HIG-REVIEW.md](docs/HIG-REVIEW.md).
+Charts use a validated colour-blind-safe palette with legends, direct labels and a data table under each chart.
 
 ## Limitations
 
