@@ -111,6 +111,7 @@ export default function Overview() {
 
       <p className="footnote secondary">
         All data is fictional.
+        {' '}Made by <a href="https://cweekiat.github.io/">cweekiat</a>.
         {started && (
           <>
             {' '}

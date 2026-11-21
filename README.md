@@ -2,6 +2,12 @@
 
 **Live demo:** https://cweekiat.github.io/concord-ahp/
 
+![Concord demo: AI drafts criteria, the consistency coach flags a judgment, the dashboard updates](docs/readme/demo.gif)
+
+**[▶ Watch the 30-second demo](docs/demo/demo.mp4)** · By [cweekiat](https://cweekiat.github.io/)
+
+![Three Concord screens: build the criteria, consistency coach, management dashboard](docs/readme/screens.png)
+
 Concord runs a team **Analytic Hierarchy Process (AHP)** evaluation for complex acquisitions, following DoD source selection practice. The AI drafts and checks. People make every judgment, and the Source Selection Authority (SSA) signs the decision.
 
 ## What's inside
